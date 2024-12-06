@@ -1,0 +1,29 @@
+[package]
+name = "pcap-minimizer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { version = "1.0.94", default-features = false, features = ["std"] }
+bisector = { version =  "0.4.0", default-features = false }
+clap = { version = "4.5.22", default-features = false, features = ["color", "derive", "help", "std", "usage"] }
+indicatif = { version =  "0.17.9", default-features = false, features = ["improved_unicode"] }
+rtshark = { version = "3.0.0", default-features = false }
+tempfile = { version = "3.14.0", default-features = false }
+thiserror = { version = "2.0.4", default-features = false, features = ["std"] }
+
+[patch.crates-io]
+rtshark = { git = "https://github.com/bbannier/rtshark", branch = "t/batch" }
+
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
+[profile.release]
+panic = "abort"
+strip = true
+codegen-units = 1
+lto = true
+opt-level = "z"
