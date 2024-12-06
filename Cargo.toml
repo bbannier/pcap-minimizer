@@ -2,6 +2,7 @@
 name = "pcap-minimizer"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/bbannier/pcap-minimizer"
 
 [dependencies]
 anyhow = { version = "1.0.94", default-features = false, features = ["std"] }
@@ -27,3 +28,8 @@ strip = true
 codegen-units = 1
 lto = true
 opt-level = "z"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
