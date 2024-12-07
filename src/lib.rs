@@ -233,6 +233,15 @@ impl Pcap {
             Right,
         }
 
+        impl Display for Side {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    Side::Left => "first".fmt(f),
+                    Side::Right => "last".fmt(f),
+                }
+            }
+        }
+
         impl Side {
             fn converge(
                 &self,
@@ -265,12 +274,7 @@ impl Pcap {
                 pcap: &Pcap,
                 progress: &Progress,
             ) -> (usize, usize) {
-                let side = match self {
-                    Side::Right => "last",
-                    Side::Left => "first",
-                };
-
-                let p = progress.section(format!("bisecting {side} {value}"));
+                let p = progress.section(format!("bisecting {self} {value}"));
                 p.update(format!("[{start}...{end}]"));
 
                 let values: Vec<_> = (start..=end).collect();
