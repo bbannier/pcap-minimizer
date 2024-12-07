@@ -243,14 +243,23 @@ impl Pcap {
                     i,
                 ) {
                     i = indices;
-                    let val = match t {
-                        ConvergeTo::Left(l) => l,
-                        ConvergeTo::Right(r) => r,
-                    };
+
+                    // Depending on the side we converge from only update the start and end if
+                    // the convergence function indicated that the tested value was in the good
+                    // range.
+                    p.update(format!("[{start}...{end}]"));
 
                     match self {
-                        Side::Right => end = val,
-                        Side::Left => start = val,
+                        Side::Left => {
+                            if let ConvergeTo::Right(x) = t {
+                                start = x;
+                            }
+                        }
+                        Side::Right => {
+                            if let ConvergeTo::Left(x) = t {
+                                end = x;
+                            }
+                        }
                     }
 
                     p.update(format!("[{start}...{end}]"));
