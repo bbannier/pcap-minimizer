@@ -234,11 +234,11 @@ impl Pcap {
                 }) = bisector.try_bisect(
                     |&x| {
                         let filter = match self {
-                            Side::Right => &format!("{value} >= {start} && {value} < {x}"),
-                            Side::Left => &format!("{value} > {x} && {value} <= {end}"),
+                            Side::Right => format!("{value} < {x}"),
+                            Side::Left => format!("{x} < {value}"),
                         };
 
-                        self.converge(x, filter, test, pcap)
+                        self.converge(x, &filter, test, pcap)
                     },
                     i,
                 ) {
@@ -274,14 +274,15 @@ impl Pcap {
         let mut start = range.start;
         let mut end = range.end;
 
-        (start, end) = Side::Right.bisect(value, start, end, test, self, progress);
-        (start, end) = Side::Left.bisect(value, start, end, test, self, progress);
+        for side in [Side::Right, Side::Left] {
+            (start, end) = side.bisect(value, start, end, test, self, progress);
+        }
 
         if (start..end) == range {
             Ok(None)
         } else {
             Ok(Some(self.filter(&format!(
-                "{value} >= {start} && {value} <= {end}"
+                "{start} <= {value} && {value} <= {end}"
             ))?))
         }
     }
