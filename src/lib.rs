@@ -30,6 +30,40 @@ impl From<String> for Test {
     }
 }
 
+struct Filter(String);
+
+impl Filter {
+    fn apply(&self, pcap: &Pcap) -> Result<Pcap, PcapError> {
+        let output = Pcap::new()?;
+
+        rtshark::RTSharkBuilder::builder()
+            .input_path(pcap.path().as_str())
+            .display_filter(&self.0)
+            .output_path(output.path().as_str())
+            .batch()
+            .map_err(PcapError::IoError)?;
+
+        Ok(output)
+    }
+}
+
+macro_rules! filter {
+    ($f:literal) => {{
+        assert!(!$f.is_empty(), "filter must not be empty");
+        Filter(format!($f))
+    }};
+}
+
+macro_rules! filter_apply {
+    ($pcap:expr, $f:literal) => {{
+        let filter = filter!($f);
+        filter.apply($pcap)
+    }};
+    ($pcap:expr, $f:expr) => {
+        $f.apply($pcap)
+    };
+}
+
 #[derive(Debug, PartialEq)]
 struct Summary {
     num_flows: usize,
@@ -126,7 +160,7 @@ impl Pcap {
             for frame in (0..value_max).rev() {
                 p.update(format!("{num_removed}/{value_max} removed"));
 
-                let chopped = filtered.filter(&format!("{filter_quantity} != {frame}"))?;
+                let chopped = filter_apply!(&filtered, "{filter_quantity} != {frame}")?;
 
                 if test.passes_with(&chopped)? {
                     filtered = chopped;
@@ -158,7 +192,7 @@ impl Pcap {
         let input = self.try_clone()?;
 
         let input = if stats.num_flows > 0 {
-            input.filter("tcp")?
+            filter_apply!(&input, "tcp")?
         } else {
             input
         };
@@ -170,21 +204,6 @@ impl Pcap {
             p.update(NO);
             Ok(None)
         }
-    }
-
-    fn filter(&self, filter: &str) -> Result<Self, PcapError> {
-        assert!(!filter.is_empty(), "filter must not be empty");
-
-        let output = Pcap::new()?;
-
-        rtshark::RTSharkBuilder::builder()
-            .input_path(self.path().as_str())
-            .display_filter(filter)
-            .output_path(output.path().as_str())
-            .batch()
-            .map_err(PcapError::IoError)?;
-
-        Ok(output)
     }
 
     fn trim_ends(
@@ -203,11 +222,11 @@ impl Pcap {
             fn converge(
                 &self,
                 x: usize,
-                filter: &str,
+                filter: &Filter,
                 test: &Test,
                 pcap: &Pcap,
             ) -> Result<ConvergeTo<usize, usize>, PcapError> {
-                let chopped = pcap.filter(filter)?;
+                let chopped = filter.apply(pcap)?;
 
                 if test.passes_with(&chopped)? {
                     match self {
@@ -248,8 +267,8 @@ impl Pcap {
                 }) = bisector.try_bisect(
                     |&x| {
                         let filter = match self {
-                            Side::Right => format!("{value} < {x}"),
-                            Side::Left => format!("{x} < {value}"),
+                            Side::Right => filter!("{value} < {x}"),
+                            Side::Left => filter!("{x} < {value}"),
                         };
 
                         self.converge(x, &filter, test, pcap)
@@ -295,9 +314,10 @@ impl Pcap {
         if (start..end) == range {
             Ok(None)
         } else {
-            Ok(Some(self.filter(&format!(
+            Ok(Some(filter_apply!(
+                self,
                 "{start} <= {value} && {value} <= {end}"
-            ))?))
+            )?))
         }
     }
 
