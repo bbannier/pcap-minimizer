@@ -402,9 +402,10 @@ pub fn minimize(input: &str, output: Option<&str>, test: &str) -> Result<(), Pca
     {
         let p = progress.section("checking that minimized file still passes test");
         if !input.validate(test)? {
+            p.update(NO);
             return Err(PcapError::MinimizationError);
         }
-        p.update(OK);
+        p.update(YES);
     }
 
     if let Some(output) = output {
