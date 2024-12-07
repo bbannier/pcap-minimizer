@@ -1,7 +1,8 @@
 pub mod progress;
 
-use std::{cmp, ops::Range, path::PathBuf, process::Command};
+use std::{cmp, ops::Range, process::Command};
 
+use camino::{Utf8Path, Utf8PathBuf};
 use progress::{Progress, NO, OK, YES};
 
 use bisector::{Bisector, ConvergeTo, Indices, Step};
@@ -30,24 +31,26 @@ pub enum PcapError {
 }
 
 enum Pcap {
-    Owned(NamedTempFile),
-    Ref(std::path::PathBuf, String),
+    Owned(NamedTempFile, Utf8PathBuf),
+    Ref(Utf8PathBuf),
 }
 
 impl Pcap {
     fn new() -> std::result::Result<Self, PcapError> {
-        Ok(Pcap::Owned(
-            NamedTempFile::new().map_err(PcapError::IoError)?,
-        ))
+        let f = NamedTempFile::new().map_err(PcapError::IoError)?;
+        let p = f
+            .path()
+            .to_path_buf()
+            .try_into()
+            .map_err(|_| PcapError::PathNotUtf8)?;
+        Ok(Pcap::Owned(f, p))
     }
 
-    fn path(&self) -> std::result::Result<&str, PcapError> {
+    fn path(&self) -> &Utf8Path {
         match self {
-            Pcap::Owned(f) => f.path(),
-            Pcap::Ref(f, _) => f.as_path(),
+            Pcap::Owned(_, p) => p,
+            Pcap::Ref(f) => f,
         }
-        .to_str()
-        .ok_or(PcapError::PathNotUtf8)
     }
 
     fn save<P>(self, new_path: P) -> std::result::Result<(), PcapError>
@@ -55,11 +58,11 @@ impl Pcap {
         P: AsRef<std::path::Path>,
     {
         match self {
-            Pcap::Owned(f) => {
+            Pcap::Owned(f, _) => {
                 f.persist(new_path.as_ref())
                     .map_err(|e| PcapError::IoError(e.error))?;
             }
-            Pcap::Ref(f, _) => {
+            Pcap::Ref(f) => {
                 std::fs::copy(f, new_path).map_err(PcapError::IoError)?;
             }
         }
@@ -68,7 +71,7 @@ impl Pcap {
     }
 
     fn validate(&self, test: &str) -> std::result::Result<bool, PcapError> {
-        let test = format!("{test} {input}", input = self.path()?);
+        let test = format!("{test} {input}", input = self.path());
         let output = Command::new("sh")
             .arg("-c")
             .arg(&test)
@@ -164,9 +167,9 @@ impl Pcap {
         let output = Pcap::new()?;
 
         rtshark::RTSharkBuilder::builder()
-            .input_path(self.path()?)
+            .input_path(self.path().as_str())
             .display_filter(filter)
-            .output_path(output.path()?)
+            .output_path(output.path().as_str())
             .batch()
             .map_err(PcapError::IoError)?;
 
@@ -289,7 +292,7 @@ impl Pcap {
 
     fn summary(&self) -> Result<Summary, PcapError> {
         let mut s = rtshark::RTSharkBuilder::builder()
-            .input_path(self.path()?)
+            .input_path(self.path().as_str())
             .metadata_whitelist("tcp.stream")
             .spawn()
             .map_err(PcapError::IoError)?;
@@ -320,23 +323,25 @@ impl Pcap {
 
     fn try_clone(&self) -> Result<Self, PcapError> {
         match &self {
-            Pcap::Owned(f) => {
+            Pcap::Owned(f, _) => {
                 let new = NamedTempFile::new().map_err(PcapError::IoError)?;
-                std::fs::copy(f, new.path().to_str().ok_or(PcapError::PathNotUtf8)?)
-                    .map_err(PcapError::IoError)?;
-                Ok(Pcap::Owned(new))
+                let new_path = new
+                    .path()
+                    .to_path_buf()
+                    .try_into()
+                    .map_err(|_| PcapError::PathNotUtf8)?;
+
+                std::fs::copy(f, new.path()).map_err(PcapError::IoError)?;
+                Ok(Pcap::Owned(new, new_path))
             }
-            Pcap::Ref(f, p) => Ok(Pcap::Ref(f.clone(), p.clone())),
+            Pcap::Ref(f) => Ok(Pcap::Ref(f.clone())),
         }
     }
 }
 
-impl TryFrom<PathBuf> for Pcap {
-    type Error = PcapError;
-
-    fn try_from(value: PathBuf) -> std::result::Result<Self, Self::Error> {
-        let path = value.to_str().ok_or(PcapError::PathNotUtf8)?.to_string();
-        Ok(Pcap::Ref(value, path))
+impl From<Utf8PathBuf> for Pcap {
+    fn from(value: Utf8PathBuf) -> Self {
+        Self::Ref(value)
     }
 }
 
@@ -346,10 +351,14 @@ enum DropKind {
     Flow,
 }
 
-pub fn minimize(input: &str, output: Option<&str>, test: &str) -> Result<(), PcapError> {
+pub fn minimize(
+    input: Utf8PathBuf,
+    output: Option<&Utf8PathBuf>,
+    test: &str,
+) -> Result<(), PcapError> {
     let progress = Progress;
 
-    let mut input = Pcap::try_from(PathBuf::from(input))?;
+    let mut input = Pcap::from(input);
 
     {
         let p = progress.section("checking whether test fails for input file");

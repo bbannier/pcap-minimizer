@@ -1,4 +1,5 @@
 use anyhow::Result;
+use camino::Utf8PathBuf;
 use clap::Parser;
 use pcap_minimizer::minimize;
 
@@ -7,11 +8,11 @@ use pcap_minimizer::minimize;
 struct Args {
     #[arg(short, long)]
     /// PCAP file to minimize
-    pcap: String,
+    pcap: Utf8PathBuf,
 
     #[arg(short, long)]
     /// Path to minimized PCAP
-    output: Option<String>,
+    output: Option<Utf8PathBuf>,
 
     #[arg(short, long)]
     /// Test command, the input file will be passed as last argument.
@@ -21,7 +22,7 @@ struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    minimize(&args.pcap, args.output.as_deref(), &args.test)?;
+    minimize(args.pcap, args.output.as_ref(), &args.test)?;
 
     Ok(())
 }
