@@ -1,6 +1,6 @@
 pub mod progress;
 
-use std::{cmp, ops::Range, process::Command};
+use std::{cmp, fmt::Display, ops::Range, process::Command};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use progress::{Progress, NO, OK, YES};
@@ -62,6 +62,21 @@ macro_rules! filter_apply {
     ($pcap:expr, $f:expr) => {
         $f.apply($pcap)
     };
+}
+
+#[derive(Debug)]
+enum Value {
+    FrameNumber,
+    TcpStream,
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::FrameNumber => "frame.number".fmt(f),
+            Value::TcpStream => "tcp.stream".fmt(f),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -208,7 +223,7 @@ impl Pcap {
 
     fn trim_ends(
         &self,
-        value: &str,
+        value: &Value,
         range: Range<usize>,
         test: &Test,
         progress: &Progress,
@@ -243,7 +258,7 @@ impl Pcap {
 
             fn bisect(
                 &self,
-                value: &str,
+                value: &Value,
                 mut start: usize,
                 mut end: usize,
                 test: &Test,
@@ -416,14 +431,16 @@ pub fn minimize(
     }
 
     if stats.num_flows > 0 {
-        let Some(f) = input.trim_ends("tcp.stream", 0..stats.num_flows, test, &progress)? else {
-            return Ok(());
-        };
-        input = f;
+        if let Some(f) = input.trim_ends(&Value::TcpStream, 0..stats.num_flows, test, &progress)? {
+            input = f;
+        }
     }
 
     let Summary { num_frames, .. } = input.summary()?;
-    if let Some(f) = input.trim_ends("frame.number", 0..num_frames, test, &progress)? {
+    // tshark numbers frames starting from 1. Still include zero so we can handle them changing
+    // their indexing.
+    #[allow(clippy::range_plus_one)]
+    if let Some(f) = input.trim_ends(&Value::FrameNumber, 0..num_frames + 1, test, &progress)? {
         input = f;
     };
 
