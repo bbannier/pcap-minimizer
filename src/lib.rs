@@ -165,7 +165,7 @@ impl Pcap {
         };
 
         let value_max = match kind {
-            DropKind::Flow => stats.num_flows,
+            DropKind::Flow => stats.num_flows + 1, // tshark numbers flows starting with zero.
             DropKind::Frame => stats.num_frames,
         };
 
