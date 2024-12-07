@@ -9,6 +9,27 @@ use bisector::{Bisector, ConvergeTo, Indices, Step};
 use tempfile::NamedTempFile;
 use thiserror::Error;
 
+#[derive(Debug, Clone)]
+pub struct Test(String);
+
+impl Test {
+    fn passes_with(&self, pcap: &Pcap) -> Result<bool, PcapError> {
+        let cmd = format!("{test} {input}", test = &self.0, input = pcap.path());
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(&cmd)
+            .output()
+            .map_err(PcapError::IoError)?;
+        Ok(output.status.success())
+    }
+}
+
+impl From<String> for Test {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 struct Summary {
     num_flows: usize,
@@ -70,20 +91,10 @@ impl Pcap {
         Ok(())
     }
 
-    fn validate(&self, test: &str) -> std::result::Result<bool, PcapError> {
-        let test = format!("{test} {input}", input = self.path());
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg(&test)
-            .output()
-            .map_err(PcapError::IoError)?;
-        Ok(output.status.success())
-    }
-
     fn drop_any(
         &self,
         kind: DropKind,
-        test: &str,
+        test: &Test,
         progress: &Progress,
     ) -> Result<Option<Pcap>, PcapError> {
         let stats = self.summary()?;
@@ -117,7 +128,7 @@ impl Pcap {
 
                 let chopped = filtered.filter(&format!("{filter_quantity} != {frame}"))?;
 
-                if chopped.validate(test)? {
+                if test.passes_with(&chopped)? {
                     filtered = chopped;
                     num_removed += 1;
                 }
@@ -133,7 +144,7 @@ impl Pcap {
 
     fn filter_tcp(
         &self,
-        test: &str,
+        test: &Test,
         stats: Option<&Summary>,
         progress: &Progress,
     ) -> Result<Option<Self>, PcapError> {
@@ -152,7 +163,7 @@ impl Pcap {
             input
         };
 
-        if input.validate(test)? {
+        if test.passes_with(&input)? {
             p.update(YES);
             Ok(Some(input))
         } else {
@@ -180,7 +191,7 @@ impl Pcap {
         &self,
         value: &str,
         range: Range<usize>,
-        test: &str,
+        test: &Test,
         progress: &Progress,
     ) -> Result<Option<Pcap>, PcapError> {
         enum Side {
@@ -193,12 +204,12 @@ impl Pcap {
                 &self,
                 x: usize,
                 filter: &str,
-                test: &str,
+                test: &Test,
                 pcap: &Pcap,
             ) -> Result<ConvergeTo<usize, usize>, PcapError> {
                 let chopped = pcap.filter(filter)?;
 
-                if chopped.validate(test)? {
+                if test.passes_with(&chopped)? {
                     match self {
                         Side::Right => Ok(ConvergeTo::Left(x)),
                         Side::Left => Ok(ConvergeTo::Right(x)),
@@ -216,7 +227,7 @@ impl Pcap {
                 value: &str,
                 mut start: usize,
                 mut end: usize,
-                test: &str,
+                test: &Test,
                 pcap: &Pcap,
                 progress: &Progress,
             ) -> (usize, usize) {
@@ -354,7 +365,7 @@ enum DropKind {
 pub fn minimize(
     input: Utf8PathBuf,
     output: Option<&Utf8PathBuf>,
-    test: &str,
+    test: &Test,
 ) -> Result<(), PcapError> {
     let progress = Progress;
 
@@ -362,7 +373,7 @@ pub fn minimize(
 
     {
         let p = progress.section("checking whether test fails for input file");
-        if !input.validate(test)? {
+        if !test.passes_with(&input)? {
             p.finish(NO);
             return Err(PcapError::TestError);
         }
@@ -410,8 +421,10 @@ pub fn minimize(
     }
 
     {
-        let p = progress.section("checking that minimized file still passes test");
-        if !input.validate(test)? {
+        let p = progress.section(
+            "checking that minimized file still passes test to deal with foresterre/bisector#3",
+        );
+        if !test.passes_with(&input)? {
             p.update(NO);
             return Err(PcapError::MinimizationError);
         }

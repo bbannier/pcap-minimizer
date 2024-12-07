@@ -1,7 +1,7 @@
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Parser;
-use pcap_minimizer::minimize;
+use pcap_minimizer::{minimize, Test};
 
 #[derive(Parser, Debug)]
 #[clap(about, version)]
@@ -16,7 +16,7 @@ struct Args {
 
     #[arg(short, long)]
     /// Test command, the input file will be passed as last argument.
-    test: String,
+    test: Test,
 }
 
 fn main() -> Result<()> {
