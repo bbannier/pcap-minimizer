@@ -9,11 +9,12 @@ according to a user-defined test.
 Usage: pcap-minimizer [OPTIONS] --pcap <PCAP> --test <TEST>
 
 Options:
-  -p, --pcap <PCAP>      PCAP file to minimize
-  -o, --output <OUTPUT>  Path to minimized PCAP
-  -t, --test <TEST>      Test command, the input file will be passed as last argument
-  -h, --help             Print help
-  -V, --version          Print version
+  -p, --pcap <PCAP>                PCAP file to minimize
+  -o, --output <OUTPUT>            Path to minimized PCAP
+  -t, --test <TEST>                Test command, the input file will be passed as last argument
+  -s, --skip-passes <SKIP_PASSES>  Minimization passes to skip, separate multiple passes by ',' [possible values: bisect-flow, bisect-packet, drop-flow, drop-frame]
+  -h, --help                       Print help
+  -V, --version                    Print version
 ```
 
 ## Installation

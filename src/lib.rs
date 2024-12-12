@@ -3,11 +3,28 @@ pub mod progress;
 use std::{cmp, fmt::Display, ops::Range, process::Command};
 
 use camino::{Utf8Path, Utf8PathBuf};
+use clap::ValueEnum;
 use progress::{Progress, NO, OK, YES};
 
 use bisector::{Bisector, ConvergeTo, Indices, Step};
 use tempfile::NamedTempFile;
 use thiserror::Error;
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, ValueEnum)]
+pub enum MinimizationPass {
+    BisectFlow,
+    BisectPacket,
+    DropFlow,
+    DropFrame,
+}
+
+struct Passes<'v>(Option<&'v Vec<MinimizationPass>>);
+
+impl Passes<'_> {
+    pub fn has(&self, opt: MinimizationPass) -> bool {
+        !self.0.map_or(true, |opts| opts.contains(&opt))
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Test(String);
@@ -96,7 +113,11 @@ pub enum PcapError {
     #[error("test does not pass for initial input")]
     TestError,
 
-    #[error("minimization produced file not passing test")]
+    #[error(
+        "minimization produced file not passing test, consider skipping bisecting passes with '-s'"
+    )]
+    // We should only really get here if bisecting produced non-sensical results due to
+    // https://github.com/foresterre/bisector/issues/3.
     MinimizationError,
 }
 
@@ -405,7 +426,10 @@ pub fn minimize(
     input: Utf8PathBuf,
     output: Option<&Utf8PathBuf>,
     test: &Test,
+    options: Option<&Vec<MinimizationPass>>,
 ) -> Result<(), PcapError> {
+    let options = Passes(options);
+
     let progress = Progress;
 
     let mut input = Pcap::from(input);
@@ -434,25 +458,31 @@ pub fn minimize(
         input = f;
     }
 
-    if stats.num_flows > 0 {
+    if options.has(MinimizationPass::BisectFlow) && stats.num_flows > 0 {
         if let Some(f) = input.trim_ends(&Value::TcpStream, 0..stats.num_flows, test, &progress)? {
             input = f;
         }
     }
 
-    let Summary { num_frames, .. } = input.summary()?;
-    // tshark numbers frames starting from 1. Still include zero so we can handle them changing
-    // their indexing.
-    #[allow(clippy::range_plus_one)]
-    if let Some(f) = input.trim_ends(&Value::FrameNumber, 0..num_frames + 1, test, &progress)? {
-        input = f;
-    };
-
-    if let Some(f) = input.drop_any(DropKind::Flow, test, &progress)? {
-        input = f;
+    if options.has(MinimizationPass::BisectPacket) {
+        let Summary { num_frames, .. } = input.summary()?;
+        // tshark numbers frames starting from 1. Still include zero so we can handle them changing
+        // their indexing.
+        #[allow(clippy::range_plus_one)]
+        if let Some(f) = input.trim_ends(&Value::FrameNumber, 0..num_frames + 1, test, &progress)? {
+            input = f;
+        };
     }
-    if let Some(f) = input.drop_any(DropKind::Frame, test, &progress)? {
-        input = f;
+
+    if options.has(MinimizationPass::DropFlow) {
+        if let Some(f) = input.drop_any(DropKind::Flow, test, &progress)? {
+            input = f;
+        }
+    }
+    if options.has(MinimizationPass::DropFrame) {
+        if let Some(f) = input.drop_any(DropKind::Frame, test, &progress)? {
+            input = f;
+        }
     }
 
     {
@@ -462,9 +492,7 @@ pub fn minimize(
     }
 
     {
-        let p = progress.section(
-            "checking that minimized file still passes test to deal with foresterre/bisector#3",
-        );
+        let p = progress.section("checking that minimized file still passes test");
         if !test.passes_with(&input)? {
             p.update(NO);
             return Err(PcapError::MinimizationError);
