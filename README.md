@@ -17,6 +17,52 @@ Options:
   -V, --version                    Print version
 ```
 
+## Implementation
+
+Given a test script and a PCAP file this tool will repeatedly remove frames
+while still making sure that the test command passes. The test command should
+return `0` if the input file is interesting. The minimizer passes the input
+file as last argument.
+
+An example test command would be `--test ./test.sh` referencing an executable shell
+script in the current directory:
+
+```sh
+#!/usr/bin/env bash
+
+set -eu
+
+# In this case the minimizes passes the input file as first argument, $1.
+FILESIZE=$(du "$1" | cut -f1)
+
+# Test passes if the input file is larger than 10 blocks.
+[[ $FILESIZE > 10 ]]
+```
+
+The minimizer implements the following passes, in order:
+
+- for a given list of TCP flows, remove flows appearing first and last (pass `bisect-flow`)
+- trim frames at the start and end of the PCAP (pass `bisect-frame`)
+- try to drop individual TCP flows, starting from the beginning (pass `drop-flow`)
+- try to drop individual packets, starting from the beginning (pass `drop-frame`)
+
+> [!NOTE]
+> Since the dropping steps can be expensive only a single pass over the data is
+> done. This means that running the minimizer again might reduce the data
+> further.
+
+The general idea is that many test cases trigger on a small number of TCP
+flows, or on a small number of frames relatively close together. The passes
+doing trimming via bisection can quickly reduce the number of frames in the
+input, so that the computationally more expense consecutive flow/frame dropping
+steps have less input to work with.
+
+> [!WARNING]
+> Currently the bisection algorithm can produce output not passing the test
+> anymore; at the end of the minimization a test for this internal error is
+> performed. If your input triggers this error try disabling one or more
+> bisection steps via `--skip-passes`.
+
 ## Installation
 
 `tshark` is required and needs to be in `PATH`, see [their
@@ -38,16 +84,3 @@ Install project from this repository.
 ```console
 cargo install --locked --git https://github.com/bbannier/pcap-minimizer
 ```
-
-## Implementation
-
-Given a test script and a PCAP file this tool will repeatedly remove frames
-while still making sure that the test script passes. We implement the following minimizations:
-
-- trim frames at the start and end of the PCAP
-- for a given list of TCP flows, remove flows appearing first and last
-
-We make no attempts to remove packets in the middle of the
-interesting range (beyond possible removal of packages from interspersed
-flows), but often inputs can still be reduced significantly (especially if the
-test triggers for TCP traffic).
