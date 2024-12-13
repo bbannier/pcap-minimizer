@@ -98,8 +98,8 @@ impl Display for Value {
 
 #[derive(Debug, PartialEq)]
 struct Summary {
-    num_flows: usize,
-    num_frames: usize,
+    num_flows: u64,
+    num_frames: u64,
 }
 
 #[derive(Debug, Error)]
@@ -169,13 +169,19 @@ impl Pcap {
     ) -> Result<Option<Pcap>, PcapError> {
         let stats = self.summary()?;
 
-        let p = progress.section(format!(
-            "dropping random {}s",
+        let p = progress.section_with_length(
+            format!(
+                "dropping consecutive {}s",
+                match kind {
+                    DropKind::Flow => "flow",
+                    DropKind::Frame => "frame",
+                }
+            ),
             match kind {
-                DropKind::Flow => "flow",
-                DropKind::Frame => "frame",
-            }
-        ));
+                DropKind::Flow => stats.num_flows,
+                DropKind::Frame => stats.num_frames,
+            },
+        );
 
         let mut filtered = self.try_clone()?;
         let mut num_removed = 0;
@@ -193,10 +199,13 @@ impl Pcap {
         if value_max == 0 {
             p.update("already minimal");
         } else {
-            for frame in (0..value_max).rev() {
-                p.update(format!("{num_removed}/{value_max} removed"));
+            for x in (0..value_max).rev() {
+                p.update_value_with_msg(
+                    value_max - x,
+                    format!("{num_removed}/{value_max} removed"),
+                );
 
-                let chopped = filter_apply!(&filtered, "{filter_quantity} != {frame}")?;
+                let chopped = filter_apply!(&filtered, "{filter_quantity} != {x}")?;
 
                 if test.passes_with(&chopped)? {
                     filtered = chopped;
@@ -245,7 +254,7 @@ impl Pcap {
     fn trim_ends(
         &self,
         value: &Value,
-        range: Range<usize>,
+        range: Range<u64>,
         test: &Test,
         progress: &Progress,
     ) -> Result<Option<Pcap>, PcapError> {
@@ -266,11 +275,11 @@ impl Pcap {
         impl Side {
             fn converge(
                 &self,
-                x: usize,
+                x: u64,
                 filter: &Filter,
                 test: &Test,
                 pcap: &Pcap,
-            ) -> Result<ConvergeTo<usize, usize>, PcapError> {
+            ) -> Result<ConvergeTo<u64, u64>, PcapError> {
                 let chopped = filter.apply(pcap)?;
 
                 if test.passes_with(&chopped)? {
@@ -289,12 +298,12 @@ impl Pcap {
             fn bisect(
                 &self,
                 value: &Value,
-                mut start: usize,
-                mut end: usize,
+                mut start: u64,
+                mut end: u64,
                 test: &Test,
                 pcap: &Pcap,
                 progress: &Progress,
-            ) -> (usize, usize) {
+            ) -> (u64, u64) {
                 let p = progress.section(format!("bisecting {self} {value}"));
                 p.update(format!("[{start}...{end}]"));
 
