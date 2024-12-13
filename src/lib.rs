@@ -13,7 +13,7 @@ use thiserror::Error;
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, ValueEnum)]
 pub enum MinimizationPass {
     BisectFlow,
-    BisectPacket,
+    BisectFrame,
     DropFlow,
     DropFrame,
 }
@@ -464,7 +464,7 @@ pub fn minimize(
         }
     }
 
-    if options.has(MinimizationPass::BisectPacket) {
+    if options.has(MinimizationPass::BisectFrame) {
         let Summary { num_frames, .. } = input.summary()?;
         // tshark numbers frames starting from 1. Still include zero so we can handle them changing
         // their indexing.
