@@ -22,7 +22,7 @@ struct Passes<'v>(Option<&'v Vec<MinimizationPass>>);
 
 impl Passes<'_> {
     pub fn has(&self, opt: MinimizationPass) -> bool {
-        !self.0.map_or(true, |opts| opts.contains(&opt))
+        !self.0.map_or(false, |opts| opts.contains(&opt))
     }
 }
 
@@ -514,4 +514,25 @@ pub fn minimize(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use crate::Passes;
+
+    #[test]
+    fn pass_has_default() {
+        // By default all passes should be enabled.
+        let xs = Passes(None);
+        assert!(xs.has(crate::MinimizationPass::DropFlow));
+    }
+
+    #[test]
+    fn pass_has_disabled() {
+        let disabled_passes = vec![crate::MinimizationPass::DropFlow];
+        let xs = Passes(Some(&disabled_passes));
+
+        assert!(!xs.has(crate::MinimizationPass::DropFlow));
+        assert!(xs.has(crate::MinimizationPass::BisectFlow));
+    }
 }
