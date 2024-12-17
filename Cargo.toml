@@ -12,7 +12,7 @@ clap = { version = "4.5.23", default-features = false, features = ["color", "der
 indicatif = { version =  "0.17.9", default-features = false, features = ["improved_unicode"] }
 rtshark = { version = "3.0.0", default-features = false }
 tempfile = { version = "3.14.0", default-features = false }
-thiserror = { version = "2.0.6", default-features = false, features = ["std"] }
+thiserror = { version = "2.0.7", default-features = false, features = ["std"] }
 
 [patch.crates-io]
 rtshark = { git = "https://github.com/bbannier/rtshark", branch = "t/batch" }
