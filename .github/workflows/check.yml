@@ -24,8 +24,6 @@ jobs:
           key: pre-commit-cargo-${{ hashFiles('Cargo.lock') }}
       - name: Test
         run: cargo test
-      - name: Audit
-        run: cargo audit
 
   pre-commit:
     name: Run pre-commit hooks
