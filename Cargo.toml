@@ -10,12 +10,9 @@ bisector = { version =  "0.4.0", default-features = false }
 camino = { version = "1.1.9", default-features = false }
 clap = { version = "4.5.23", default-features = false, features = ["color", "derive", "help", "std", "suggestions", "usage"] }
 indicatif = { version =  "0.17.9", default-features = false, features = ["improved_unicode"] }
-rtshark = { version = "3.0.0", default-features = false }
+rtshark = { version = "3.1.0", default-features = false }
 tempfile = { version = "3.14.0", default-features = false }
 thiserror = { version = "2.0.7", default-features = false, features = ["std"] }
-
-[patch.crates-io]
-rtshark = { git = "https://github.com/bbannier/rtshark", branch = "t/batch" }
 
 [lints.clippy]
 pedantic = { level = "deny", priority = -1 }
