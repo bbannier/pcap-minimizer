@@ -463,11 +463,15 @@ pub fn minimize(
         ));
     }
 
-    if let Some(f) = input.filter_tcp(test, Some(&stats), &progress)? {
+    // Operating on TCP flows only makes sense if the test passes with only TCP.
+    let tcp_only = if let Some(f) = input.filter_tcp(test, Some(&stats), &progress)? {
         input = f;
-    }
+        true
+    } else {
+        false
+    };
 
-    if options.has(MinimizationPass::BisectFlow) && stats.num_flows > 0 {
+    if tcp_only && options.has(MinimizationPass::BisectFlow) && stats.num_flows > 0 {
         if let Some(f) = input.trim_ends(&Value::TcpStream, 0..stats.num_flows, test, &progress)? {
             input = f;
         }
@@ -483,7 +487,7 @@ pub fn minimize(
         };
     }
 
-    if options.has(MinimizationPass::DropFlow) {
+    if tcp_only && options.has(MinimizationPass::DropFlow) {
         if let Some(f) = input.drop_any(DropKind::Flow, test, &progress)? {
             input = f;
         }
