@@ -22,7 +22,7 @@ struct Passes<'v>(Option<&'v Vec<MinimizationPass>>);
 
 impl Passes<'_> {
     pub fn has(&self, opt: MinimizationPass) -> bool {
-        !self.0.map_or(false, |opts| opts.contains(&opt))
+        !self.0.is_some_and(|opts| opts.contains(&opt))
     }
 }
 
