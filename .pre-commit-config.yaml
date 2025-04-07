@@ -20,11 +20,11 @@ repos:
     hooks:
       - id: gitlint
   - repo: https://github.com/crate-ci/typos
-    rev: v1.29.4 # aka typos-dict-v0.12.3
+    rev: v1.31.1 # aka typos-dict-v0.12.9
     hooks:
       - id: typos
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.43.0
+    rev: v0.44.0
     hooks:
       - id: markdownlint-fix
   - repo: https://github.com/pre-commit/pre-commit-hooks
