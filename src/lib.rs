@@ -484,7 +484,7 @@ pub fn minimize(
         #[allow(clippy::range_plus_one)]
         if let Some(f) = input.trim_ends(&Value::FrameNumber, 0..num_frames + 1, test, &progress)? {
             input = f;
-        };
+        }
     }
 
     if tcp_only && options.has(MinimizationPass::DropFlow) {
