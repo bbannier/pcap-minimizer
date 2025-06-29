@@ -1,7 +1,7 @@
 [package]
 name = "pcap-minimizer"
 version = "0.3.0"
-edition = "2021"
+edition = "2024"
 repository = "https://github.com/bbannier/pcap-minimizer"
 description = "A tool for automatic minimization of PCAPs"
 license = "GPL-3.0-only"

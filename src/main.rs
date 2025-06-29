@@ -1,7 +1,7 @@
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use clap::Parser;
-use pcap_minimizer::{minimize, MinimizationPass, Test};
+use pcap_minimizer::{MinimizationPass, Test, minimize};
 
 #[derive(Parser, Debug)]
 #[clap(about, version)]

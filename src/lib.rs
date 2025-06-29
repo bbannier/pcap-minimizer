@@ -4,7 +4,7 @@ use std::{cmp, fmt::Display, ops::Range, process::Command};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::ValueEnum;
-use progress::{Progress, NO, OK, YES};
+use progress::{NO, OK, Progress, YES};
 
 use bisector::{Bisector, ConvergeTo, Indices, Step};
 use tempfile::NamedTempFile;
@@ -72,11 +72,11 @@ macro_rules! filter {
 }
 
 macro_rules! filter_apply {
-    ($pcap:expr, $f:literal) => {{
+    ($pcap:expr_2021, $f:literal) => {{
         let filter = filter!($f);
         filter.apply($pcap)
     }};
-    ($pcap:expr, $f:expr) => {
+    ($pcap:expr_2021, $f:expr_2021) => {
         $f.apply($pcap)
     };
 }
@@ -464,11 +464,12 @@ pub fn minimize(
     }
 
     // Operating on TCP flows only makes sense if the test passes with only TCP.
-    let tcp_only = if let Some(f) = input.filter_tcp(test, Some(&stats), &progress)? {
-        input = f;
-        true
-    } else {
-        false
+    let tcp_only = match input.filter_tcp(test, Some(&stats), &progress)? {
+        Some(f) => {
+            input = f;
+            true
+        }
+        _ => false,
     };
 
     if tcp_only && options.has(MinimizationPass::BisectFlow) && stats.num_flows > 0 {
