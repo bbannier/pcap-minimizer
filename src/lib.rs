@@ -12,17 +12,91 @@ use thiserror::Error;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, ValueEnum)]
 pub enum MinimizationPass {
+    // The order in which passes are declared here also declares the order in which they are run.
     BisectFlow,
     BisectFrame,
     DropFlow,
     DropFrame,
 }
 
-struct Passes<'v>(Option<&'v Vec<MinimizationPass>>);
+impl MinimizationPass {
+    fn run(
+        self,
+        input: &Pcap,
+        stats: &Summary,
+        test: &Test,
+        progress: &Progress,
+        tcp_only: bool,
+    ) -> Option<Pcap> {
+        if !tcp_only && self.is_tcp_only() {
+            return None;
+        }
 
-impl Passes<'_> {
-    pub fn has(&self, opt: MinimizationPass) -> bool {
-        !self.0.is_some_and(|opts| opts.contains(&opt))
+        let output = match self {
+            MinimizationPass::BisectFlow => {
+                input.trim_ends(&Value::TcpStream, 0..stats.num_flows, test, progress)
+            }
+            MinimizationPass::DropFlow => input.drop_any(DropKind::Flow, test, progress),
+            MinimizationPass::DropFrame => input.drop_any(DropKind::Frame, test, progress),
+            MinimizationPass::BisectFrame => {
+                // tshark numbers frames starting from 1. Still include zero so we can handle them changing
+                // their indexing.
+                #[allow(clippy::range_plus_one)]
+                input.trim_ends(&Value::FrameNumber, 0..stats.num_frames + 1, test, progress)
+            }
+        };
+
+        output.ok().flatten()
+    }
+
+    fn is_tcp_only(self) -> bool {
+        match self {
+            MinimizationPass::DropFlow | MinimizationPass::BisectFlow => true,
+            MinimizationPass::DropFrame | MinimizationPass::BisectFrame => false,
+        }
+    }
+}
+
+pub struct Passes(Vec<MinimizationPass>);
+
+impl Default for Passes {
+    fn default() -> Self {
+        let passes = [
+            MinimizationPass::BisectFlow,
+            MinimizationPass::BisectFrame,
+            MinimizationPass::DropFlow,
+            MinimizationPass::DropFrame,
+        ]
+        .into_iter()
+        .collect();
+
+        Self(passes)
+    }
+}
+
+impl Passes {
+    #[must_use]
+    pub fn skipping(skipped_passes: &[MinimizationPass]) -> Self {
+        let mut passes = Self::default();
+
+        for pass in skipped_passes {
+            passes = Self(passes.0.into_iter().filter(|p| p != pass).collect());
+        }
+
+        passes
+    }
+
+    fn run(&self, input: &Pcap, test: &Test, progress: &Progress, tcp_only: bool) -> Option<Pcap> {
+        let mut result = None;
+        for pass in &self.0 {
+            progress.section(format!("Running pass {pass:?}"));
+            let stats = &input.summary().ok()?;
+            if let Some(output) = pass.run(input, stats, test, progress, tcp_only) {
+                result = Some(output);
+            }
+        }
+
+        result
     }
 }
 
@@ -130,6 +204,12 @@ pub enum PcapError {
     // We should only really get here if bisecting produced non-sensical results due to
     // https://github.com/foresterre/bisector/issues/3.
     MinimizationError,
+
+    #[error("no passes selected")]
+    NoPassesError,
+
+    #[error("could not reduce input")]
+    CouldNotReduceError,
 }
 
 enum Pcap {
@@ -170,6 +250,10 @@ impl Pcap {
         }
 
         Ok(())
+    }
+
+    fn size(&self) -> std::io::Result<u64> {
+        Ok(std::fs::metadata(self.path())?.len())
     }
 
     fn drop_any(
@@ -232,22 +316,12 @@ impl Pcap {
         })
     }
 
-    fn filter_tcp(
-        &self,
-        test: &Test,
-        stats: Option<&Summary>,
-        progress: &Progress,
-    ) -> Result<Option<Self>, PcapError> {
-        let stats = match stats {
-            Some(s) => s,
-            None => &self.summary()?,
-        };
-
+    fn filter_tcp(&self, test: &Test, progress: &Progress) -> Result<Option<Self>, PcapError> {
         let p = progress.section("checking whether test reproduces with only TCP traffic");
 
         let input = self.try_clone()?;
 
-        let input = if stats.num_flows > 0 {
+        let input = if self.summary()?.num_flows > 0 {
             filter_apply!(&input, "tcp")?
         } else {
             input
@@ -450,16 +524,20 @@ pub fn minimize(
     input: Utf8PathBuf,
     output: Option<&Utf8PathBuf>,
     test: &Test,
-    options: Option<&Vec<MinimizationPass>>,
+    passes: &Passes,
 ) -> Result<(), PcapError> {
-    let options = Passes(options);
+    if passes.0.is_empty() {
+        return Err(PcapError::NoPassesError);
+    }
 
     let progress = Progress;
 
     let mut input = Pcap::try_from(input).map_err(PcapError::IoError)?;
 
+    let initial_size = input.size().map_err(PcapError::IoError)?;
+
     {
-        let p = progress.section("checking whether test fails for input file");
+        let p = progress.section("checking whether test triggers for input file");
         if !test.passes_with(&input)? {
             p.finish(NO);
             return Err(PcapError::TestError);
@@ -467,19 +545,8 @@ pub fn minimize(
         p.update(YES);
     }
 
-    let stats: Summary;
-    {
-        let p = progress.section("gathering statistics");
-        stats = input.summary()?;
-        p.finish(format!(
-            "reducing {frames} frames in {flows} TCP flows",
-            frames = stats.num_frames,
-            flows = stats.num_flows
-        ));
-    }
-
     // Operating on TCP flows only makes sense if the test passes with only TCP.
-    let tcp_only = match input.filter_tcp(test, Some(&stats), &progress)? {
+    let tcp_only = match input.filter_tcp(test, &progress)? {
         Some(f) => {
             input = f;
             true
@@ -487,37 +554,8 @@ pub fn minimize(
         _ => false,
     };
 
-    if tcp_only && options.has(MinimizationPass::BisectFlow) && stats.num_flows > 0 {
-        if let Some(f) = input.trim_ends(&Value::TcpStream, 0..stats.num_flows, test, &progress)? {
-            input = f;
-        }
-    }
-
-    if options.has(MinimizationPass::BisectFrame) {
-        let Summary { num_frames, .. } = input.summary()?;
-        // tshark numbers frames starting from 1. Still include zero so we can handle them changing
-        // their indexing.
-        #[allow(clippy::range_plus_one)]
-        if let Some(f) = input.trim_ends(&Value::FrameNumber, 0..num_frames + 1, test, &progress)? {
-            input = f;
-        }
-    }
-
-    if tcp_only && options.has(MinimizationPass::DropFlow) {
-        if let Some(f) = input.drop_any(DropKind::Flow, test, &progress)? {
-            input = f;
-        }
-    }
-    if options.has(MinimizationPass::DropFrame) {
-        if let Some(f) = input.drop_any(DropKind::Frame, test, &progress)? {
-            input = f;
-        }
-    }
-
-    {
-        let p = progress.section("reduced statistics");
-        let Summary { num_frames, .. } = input.summary()?;
-        p.update(format!("{num_frames} frames"));
+    if let Some(result) = passes.run(&input, test, &progress, tcp_only) {
+        input = result;
     }
 
     {
@@ -529,30 +567,23 @@ pub fn minimize(
         p.update(YES);
     }
 
+    let final_size = input.size().map_err(PcapError::IoError)?;
+    if final_size == initial_size {
+        return Err(PcapError::CouldNotReduceError);
+    }
+
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )]
+    let reduction = 100 - ((final_size as f64) / (initial_size as f64) * 100.) as u64;
+    progress
+        .section(format!("input was reduced by {reduction}%"))
+        .finish(OK);
     if let Some(output) = output {
         input.save(output)?;
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use crate::Passes;
-
-    #[test]
-    fn pass_has_default() {
-        // By default all passes should be enabled.
-        let xs = Passes(None);
-        assert!(xs.has(crate::MinimizationPass::DropFlow));
-    }
-
-    #[test]
-    fn pass_has_disabled() {
-        let disabled_passes = vec![crate::MinimizationPass::DropFlow];
-        let xs = Passes(Some(&disabled_passes));
-
-        assert!(!xs.has(crate::MinimizationPass::DropFlow));
-        assert!(xs.has(crate::MinimizationPass::BisectFlow));
-    }
 }
