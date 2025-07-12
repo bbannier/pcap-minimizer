@@ -430,9 +430,13 @@ impl Pcap {
     }
 }
 
-impl From<Utf8PathBuf> for Pcap {
-    fn from(value: Utf8PathBuf) -> Self {
-        Self::Ref(value)
+impl TryFrom<Utf8PathBuf> for Pcap {
+    type Error = std::io::Error;
+
+    fn try_from(value: Utf8PathBuf) -> Result<Self, Self::Error> {
+        let path = value.as_std_path().canonicalize()?;
+        let path = Utf8PathBuf::try_from(path).map_err(camino::FromPathBufError::into_io_error)?;
+        Ok(Self::Ref(path))
     }
 }
 
@@ -452,7 +456,7 @@ pub fn minimize(
 
     let progress = Progress;
 
-    let mut input = Pcap::from(input);
+    let mut input = Pcap::try_from(input).map_err(PcapError::IoError)?;
 
     {
         let p = progress.section("checking whether test fails for input file");
