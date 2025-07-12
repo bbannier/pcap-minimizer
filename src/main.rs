@@ -15,7 +15,7 @@ struct Args {
     output: Option<Utf8PathBuf>,
 
     #[arg(short, long)]
-    /// Test command, the input file will be passed as last argument.
+    /// Test script, the input file will be passed as last argument.
     test: Test,
 
     /// Minimization passes to skip, separate multiple passes by ','.

@@ -1,6 +1,6 @@
 pub mod progress;
 
-use std::{cmp, fmt::Display, ops::Range, process::Command};
+use std::{cmp, fmt::Display, ops::Range, process::Command, str::FromStr};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::ValueEnum;
@@ -27,7 +27,7 @@ impl Passes<'_> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Test(String);
+pub struct Test(Utf8PathBuf);
 
 impl Test {
     fn passes_with(&self, pcap: &Pcap) -> Result<bool, PcapError> {
@@ -41,9 +41,20 @@ impl Test {
     }
 }
 
-impl From<String> for Test {
-    fn from(value: String) -> Self {
-        Self(value)
+impl FromStr for Test {
+    type Err = std::io::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let path = Utf8PathBuf::from(s);
+
+        let path = if path.is_relative() {
+            let path = path.as_std_path().canonicalize()?;
+            Utf8PathBuf::try_from(path).map_err(camino::FromPathBufError::into_io_error)?
+        } else {
+            path
+        };
+
+        Ok(Self(path))
     }
 }
 
