@@ -88,6 +88,7 @@ impl Passes {
 
     fn run(&self, input: &Pcap, test: &Test, progress: &Progress, tcp_only: bool) -> Option<Pcap> {
         let mut result = None;
+
         for pass in &self.0 {
             progress.section(format!("Running pass {pass:?}"));
             let stats = &input.summary().ok()?;
@@ -554,7 +555,11 @@ pub fn minimize(
         _ => false,
     };
 
-    if let Some(result) = passes.run(&input, test, &progress, tcp_only) {
+    while let Some(result) = passes.run(&input, test, &progress, tcp_only) {
+        if result.size().ok() == input.size().ok() {
+            break;
+        }
+
         input = result;
     }
 

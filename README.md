@@ -41,15 +41,11 @@ FILESIZE=$(du "$1" | cut -f1)
 
 The minimizer implements the following passes, in order:
 
-- for a given list of TCP flows, remove flows appearing first and last (pass `bisect-flow`)
-- trim frames at the start and end of the PCAP (pass `bisect-frame`)
-- try to drop individual TCP flows, starting from the beginning (pass `drop-flow`)
-- try to drop individual packets, starting from the beginning (pass `drop-frame`)
-
-> [!NOTE]
-> Since the dropping steps can be expensive only a single pass over the data is
-> done. This means that running the minimizer again might reduce the data
-> further.
+1. for a given list of TCP flows, remove flows appearing first and last (pass `bisect-flow`)
+2. trim frames at the start and end of the PCAP (pass `bisect-frame`)
+3. try to drop individual TCP flows, starting from the beginning (pass `drop-flow`)
+4. try to drop individual packets, starting from the beginning (pass `drop-frame`)
+5. if the file size is smaller, go to (1), else break
 
 The general idea is that many test cases trigger on a small number of TCP
 flows, or on a small number of frames relatively close together. The passes
