@@ -33,3 +33,6 @@ opt-level = "z"
 [profile.dist]
 inherits = "release"
 lto = "thin"
+
+[dev-dependencies]
+pathdiff = "0.2.3"
