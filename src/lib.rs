@@ -28,15 +28,15 @@ impl MinimizationPass {
         progress: &Progress,
         tcp_only: bool,
     ) -> Option<Pcap> {
-        if !tcp_only && self.is_tcp_only() {
-            return None;
-        }
+        let tcp_only = tcp_only && self.is_tcp_only();
 
         let output = match self {
-            MinimizationPass::BisectFlow => {
+            MinimizationPass::BisectFlow if tcp_only => {
                 input.trim_ends(&Value::TcpStream, 0..stats.num_flows, test, progress)
             }
-            MinimizationPass::DropFlow => input.drop_any(DropKind::Flow, test, progress),
+            MinimizationPass::DropFlow if tcp_only => {
+                input.drop_any(DropKind::Flow, test, progress)
+            }
             MinimizationPass::DropFrame => input.drop_any(DropKind::Frame, test, progress),
             MinimizationPass::BisectFrame => {
                 // tshark numbers frames starting from 1. Still include zero so we can handle them changing
@@ -44,6 +44,7 @@ impl MinimizationPass {
                 #[allow(clippy::range_plus_one)]
                 input.trim_ends(&Value::FrameNumber, 0..stats.num_frames + 1, test, progress)
             }
+            _ => Ok(None),
         };
 
         output.ok().flatten()
