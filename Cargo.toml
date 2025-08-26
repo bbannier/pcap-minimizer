@@ -14,7 +14,7 @@ clap = { version = "4.5.45", default-features = false, features = ["color", "der
 indicatif = { version =  "0.18.0", default-features = false, features = ["improved_unicode"] }
 rtshark = { version = "3.2.0", default-features = false }
 tempfile = { version = "3.21.0", default-features = false }
-thiserror = { version = "2.0.15", default-features = false, features = ["std"] }
+thiserror = { version = "2.0.16", default-features = false, features = ["std"] }
 
 [lints.clippy]
 pedantic = { level = "deny", priority = -1 }
