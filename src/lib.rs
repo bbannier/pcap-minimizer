@@ -91,9 +91,14 @@ impl Passes {
         let mut result = None;
 
         for pass in &self.0 {
+            let current: &Pcap = match result.as_ref() {
+                Some(f) => f,
+                None => input,
+            };
+
             progress.section(format!("Running pass {pass:?}"));
-            let stats = &input.summary().ok()?;
-            if let Some(output) = pass.run(input, stats, test, progress, tcp_only) {
+            let stats = &current.summary().ok()?;
+            if let Some(output) = pass.run(current, stats, test, progress, tcp_only) {
                 result = Some(output);
             }
         }
