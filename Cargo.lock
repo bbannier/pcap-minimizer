@@ -321,9 +321,9 @@ dependencies = [
 
 [[package]]
 name = "rtshark"
-version = "4.0.0"
+version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "468b8f8316688edf965d3f7f278a7eea5452e1ac4919a32742636a8e7f26eda6"
+checksum = "5dfa573d068c563815b21e6cb1567d714656e984ad783bf6ede1f889465eb40a"
 dependencies = [
  "chrono",
  "quick-xml",

@@ -12,8 +12,7 @@ bisector = { version =  "0.4.0", default-features = false }
 camino = { version = "1.2.1", default-features = false }
 clap = { version = "4.5.48", default-features = false, features = ["color", "derive", "help", "std", "suggestions", "usage"] }
 indicatif = { version =  "0.18.0", default-features = false, features = ["improved_unicode"] }
-# We do not in fact require `quick-xml`, but upstream broke builds without it, https://github.com/CrabeDeFrance/rtshark/issues/33.
-rtshark = { version = "4.0.0", default-features = false, features = ["quick-xml"] }
+rtshark = { version = "4.0.1", default-features = false }
 tempfile = { version = "3.23.0", default-features = false }
 thiserror = { version = "2.0.17", default-features = false, features = ["std"] }
 
