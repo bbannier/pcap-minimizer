@@ -11,7 +11,7 @@ anyhow = { version = "1.0.101", default-features = false, features = ["std"] }
 bisector = { version =  "0.4.0", default-features = false }
 camino = { version = "1.2.2", default-features = false }
 clap = { version = "4.5.58", default-features = false, features = ["color", "derive", "help", "std", "suggestions", "usage"] }
-indicatif = { version =  "0.18.3", default-features = false, features = ["improved_unicode"] }
+indicatif = { version =  "0.18.4", default-features = false, features = ["improved_unicode"] }
 rtshark = { version = "4.2.0", default-features = false }
 tempfile = { version = "3.25.0", default-features = false }
 thiserror = { version = "2.0.18", default-features = false, features = ["std"] }
