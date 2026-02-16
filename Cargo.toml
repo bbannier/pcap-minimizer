@@ -12,7 +12,7 @@ bisector = { version =  "0.4.0", default-features = false }
 camino = { version = "1.2.2", default-features = false }
 clap = { version = "4.5.57", default-features = false, features = ["color", "derive", "help", "std", "suggestions", "usage"] }
 indicatif = { version =  "0.18.3", default-features = false, features = ["improved_unicode"] }
-rtshark = { version = "4.1.0", default-features = false }
+rtshark = { version = "4.2.0", default-features = false }
 tempfile = { version = "3.24.0", default-features = false }
 thiserror = { version = "2.0.18", default-features = false, features = ["std"] }
 
