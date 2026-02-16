@@ -303,9 +303,9 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.38.3"
+version = "0.39.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42a232e7487fc2ef313d96dde7948e7a3c05101870d8985e4fd8d26aedd27b89"
+checksum = "bd58c6a1fc307e1092aa0bb23d204ca4d1f021764142cd0424dccc84d2d5d106"
 dependencies = [
  "memchr",
 ]
@@ -321,9 +321,9 @@ dependencies = [
 
 [[package]]
 name = "rtshark"
-version = "4.1.0"
+version = "4.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c6dbe3cfb9e8bbce7a6dc271daa946eacacee570bb473e4d81d358495e766ae"
+checksum = "e9ac7feba13fc5981a5c8ec4ae6945255278ad204c477f13f51ec9da9314887d"
 dependencies = [
  "chrono",
  "quick-xml",
