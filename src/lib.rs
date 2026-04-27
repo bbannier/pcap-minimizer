@@ -472,11 +472,7 @@ impl Pcap {
         let mut num_flows = 0;
         let mut num_frames = 0;
 
-        loop {
-            let Some(p) = s.read().map_err(PcapError::IoError)? else {
-                break;
-            };
-
+        while let Some(p) = s.read().map_err(PcapError::IoError)? {
             num_frames += 1;
 
             if let Some(tcp_stream) = p.layer_name("tcp").and_then(|l| {

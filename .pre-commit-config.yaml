@@ -15,12 +15,8 @@ repos:
       - id: clippy
         args: ["--all", "--all-features"]
       - id: cargo-check
-  - repo: https://github.com/jorisroovers/gitlint
-    rev: acc9d9de6369b76d22cb4167029d2035e8730b98  # frozen: v0.19.1
-    hooks:
-      - id: gitlint
   - repo: https://github.com/crate-ci/typos
-    rev: 631208b7aac2daa8b707f55e7331f9112b0e062d  # frozen: v1.44.0
+    rev: cf5f1c29a8ac336af8568821ec41919923b05a83  # frozen: v1.45.1
     hooks:
       - id: typos
   - repo: https://github.com/igorshubovych/markdownlint-cli
