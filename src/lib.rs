@@ -112,7 +112,7 @@ pub struct Test(Utf8PathBuf);
 
 impl Test {
     fn passes_with(&self, pcap: &Pcap) -> Result<bool, PcapError> {
-        let cmd = format!("{test} {input}", test = &self.0, input = pcap.path());
+        let cmd = format!("{test} {input}", test = self.0, input = pcap.path());
         let output = Command::new("sh")
             .arg("-c")
             .arg(&cmd)
