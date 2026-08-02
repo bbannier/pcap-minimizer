@@ -124,12 +124,14 @@ pub struct Test(Utf8PathBuf);
 impl Test {
     fn passes_with(&self, pcap: &Pcap) -> Result<bool, PcapError> {
         let cmd = format!("{test} {input}", test = self.0, input = pcap.path());
-        let output = Command::new("sh")
+
+        let status = Command::new("sh")
             .arg("-c")
             .arg(&cmd)
-            .output()
+            .status()
             .map_err(PcapError::IoError)?;
-        Ok(output.status.success())
+
+        Ok(status.success())
     }
 }
 
@@ -156,12 +158,18 @@ impl Filter {
     fn apply(&self, pcap: &Pcap) -> Result<Pcap, PcapError> {
         let output = Pcap::new()?;
 
-        rtshark::RTSharkBuilder::builder()
-            .input_path(pcap.path().as_str())
-            .display_filter(&self.0)
-            .output_path(output.path().as_str())
-            .batch()
+        let result = Command::new("tshark")
+            .args(["-r", pcap.path().as_str()])
+            .args(["-Y", &self.0])
+            .args(["-w", output.path().as_str()])
+            .output()
             .map_err(PcapError::IoError)?;
+
+        if !result.status.success() {
+            return Err(PcapError::IoError(std::io::Error::other(
+                String::from_utf8_lossy(&result.stderr).into_owned(),
+            )));
+        }
 
         Ok(output)
     }
@@ -474,23 +482,26 @@ impl Pcap {
     }
 
     fn summary(&self) -> Result<Summary, PcapError> {
-        let mut s = rtshark::RTSharkBuilder::builder()
-            .input_path(self.path().as_str())
-            .metadata_whitelist("tcp.stream")
-            .spawn()
+        let output = Command::new("tshark")
+            .args(["-r", self.path().as_str()])
+            .args(["-T", "fields", "-e", "tcp.stream"])
+            .output()
             .map_err(PcapError::IoError)?;
 
-        let mut num_flows = 0;
-        let mut num_frames = 0;
+        if !output.status.success() {
+            return Err(PcapError::IoError(std::io::Error::other(
+                String::from_utf8_lossy(&output.stderr).into_owned(),
+            )));
+        }
 
-        while let Some(p) = s.read().map_err(PcapError::IoError)? {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut num_flows = 0u64;
+        let mut num_frames = 0u64;
+
+        for line in stdout.lines() {
             num_frames += 1;
-
-            if let Some(tcp_stream) = p.layer_name("tcp").and_then(|l| {
-                l.metadata("tcp.stream")
-                    .and_then(|m| m.value().parse().ok())
-            }) {
-                num_flows = cmp::max(tcp_stream, num_flows);
+            if let Ok(stream) = line.trim().parse::<u64>() {
+                num_flows = cmp::max(stream, num_flows);
             }
         }
 
