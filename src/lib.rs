@@ -19,42 +19,47 @@ pub enum MinimizationPass {
     DropFrame,
 }
 
-impl MinimizationPass {
-    fn run(
-        self,
-        input: &Pcap,
-        stats: &Summary,
-        test: &Test,
-        progress: &Progress,
-        tcp_only: bool,
-    ) -> Option<Pcap> {
-        let tcp_only = tcp_only && self.is_tcp_only();
+struct PassContext<'a> {
+    test: &'a Test,
+    progress: &'a Progress,
+    tcp_only: bool,
+    summary: &'a Summary,
+}
 
+impl MinimizationPass {
+    fn run(self, input: &Pcap, ctx: &PassContext) -> Option<Pcap> {
         let output = match self {
-            MinimizationPass::BisectFlow if tcp_only => {
-                input.trim_ends(&Value::TcpStream, 0..stats.num_flows, test, progress)
+            MinimizationPass::BisectFlow => {
+                if !ctx.tcp_only {
+                    return None;
+                }
+                input.trim_ends(
+                    &Value::TcpStream,
+                    0..ctx.summary.num_flows,
+                    ctx.test,
+                    ctx.progress,
+                )
             }
-            MinimizationPass::DropFlow if tcp_only => {
-                input.drop_any(DropKind::Flow, test, progress)
+            MinimizationPass::DropFlow => {
+                if !ctx.tcp_only {
+                    return None;
+                }
+                input.drop_any(DropKind::Flow, ctx.test, ctx.progress)
             }
-            MinimizationPass::DropFrame => input.drop_any(DropKind::Frame, test, progress),
-            MinimizationPass::BisectFrame => {
-                // tshark numbers frames starting from 1. Still include zero so we can handle them changing
-                // their indexing.
+            MinimizationPass::DropFrame => input.drop_any(DropKind::Frame, ctx.test, ctx.progress),
+            MinimizationPass::BisectFrame =>
+            {
                 #[allow(clippy::range_plus_one)]
-                input.trim_ends(&Value::FrameNumber, 0..stats.num_frames + 1, test, progress)
+                input.trim_ends(
+                    &Value::FrameNumber,
+                    0..ctx.summary.num_frames + 1,
+                    ctx.test,
+                    ctx.progress,
+                )
             }
-            _ => Ok(None),
         };
 
         output.ok().flatten()
-    }
-
-    fn is_tcp_only(self) -> bool {
-        match self {
-            MinimizationPass::DropFlow | MinimizationPass::BisectFlow => true,
-            MinimizationPass::DropFrame | MinimizationPass::BisectFrame => false,
-        }
     }
 }
 
@@ -97,8 +102,14 @@ impl Passes {
             };
 
             progress.section(format!("Running pass {pass:?}"));
-            let stats = &current.summary().ok()?;
-            if let Some(output) = pass.run(current, stats, test, progress, tcp_only) {
+            let summary = &current.summary().ok()?;
+            let ctx = PassContext {
+                test,
+                progress,
+                tcp_only,
+                summary,
+            };
+            if let Some(output) = pass.run(current, &ctx) {
                 result = Some(output);
             }
         }
