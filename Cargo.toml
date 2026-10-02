@@ -8,7 +8,7 @@ license = "GPL-3.0-only"
 
 [dependencies]
 anyhow = { version = "1.0.104", default-features = false, features = ["std"] }
-bisector = { version =  "0.4.0", default-features = false }
+bisector = { version =  "1.0.0", default-features = false }
 camino = { version = "1.2.5", default-features = false }
 clap = { version = "4.6.5", default-features = false, features = ["color", "derive", "help", "std", "suggestions", "usage"] }
 indicatif = { version =  "0.18.6", default-features = false, features = ["improved_unicode"] }
