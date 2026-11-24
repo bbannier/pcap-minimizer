@@ -26,6 +26,9 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
+      # On ubuntu tshark is confined by AppArmor and cannot read files
+      # from arbitrary paths like the CI workspace.
+      - run: sudo apparmor_parser -R /etc/apparmor.d/tshark
       - uses: moonrepo/setup-rust@abb2d32350334249b178c401e5ec5836e0cd88d3
       - name: Test
         run: cargo test
