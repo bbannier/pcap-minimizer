@@ -16,7 +16,7 @@ repos:
         args: ["--all", "--all-features"]
       - id: cargo-check
   - repo: https://github.com/crate-ci/typos
-    rev: 276087d9a4f06398b3e04825487805e2d7375888  # frozen: v1.52.2
+    rev: b859c0df7f391deba73030f79b957e62b4d81dc6  # frozen: varcon-core-v5.0.7
     hooks:
       - id: typos
   - repo: https://github.com/igorshubovych/markdownlint-cli
